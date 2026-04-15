@@ -23,9 +23,12 @@ Behavioral analytics and personalized content delivery SDK for Android. CypienSD
   - [Purchase / Order Confirmation](#purchase--order-confirmation)
   - [Search Screen](#search-screen)
 - [User Management](#user-management)
+- [Personalization](#personalization)
+- [Triggers & Dynamic Content](#triggers--dynamic-content)
 - [Debug & Testing](#debug--testing)
-- [Privacy & GDPR](#privacy--gdpr)
-- [Configuration Reference](#configuration-reference)
+- [Privacy / GDPR](#privacy--gdpr)
+- [How It Works](#how-it-works)
+- [Configuration](#configuration)
 - [API Reference](#api-reference)
 - [License](#license)
 
@@ -82,7 +85,7 @@ dependencies {
 
 ### 1. Create an Application class
 
-Initialize the SDK once, at application startup, inside your `Application` subclass. Obtain your **Workspace ID** and **API Key** from the [Cypien Dashboard](https://app.cypien.ai).
+Initialize the SDK once, at application startup, inside your `Application` subclass. Obtain your **Workspace ID** and **API Key** from Cypien.
 
 ```kotlin
 import android.app.Application
@@ -368,6 +371,60 @@ CypienSDK.resetUser()
 
 ---
 
+## Personalization
+
+The SDK automatically assigns an interest segment based on browsing behavior. Calling `fetchDescription` or `fetchProductImage` returns content filtered by that segment.
+
+### Interest Updates
+
+```kotlin
+// Register once in Application.onCreate()
+CypienSDK.onInterestUpdated { interest ->
+    // interest is a string like "sport", "electronics", "home"
+    Log.d("Cypien", "Interest segment: $interest")
+}
+
+// Read current interest synchronously
+val currentInterest = CypienSDK.currentInterest
+```
+
+### Content Result Types
+
+```kotlin
+CypienSDK.content.onContentReady("product_description") { result ->
+    when (result) {
+        is CypienContentResult.Description -> textView.text = result.text
+        is CypienContentResult.Image -> imageView.load(result.url)
+        is CypienContentResult.Empty -> { /* show default */ }
+        is CypienContentResult.Error -> { /* show default */ }
+    }
+}
+```
+
+---
+
+## Triggers & Dynamic Content
+
+### Triggers (Popup / Banner / Toast / Bottom Sheet)
+
+Triggers fire automatically based on user behavior rules defined in Cypien. Register a handler once at startup:
+
+```kotlin
+CypienSDK.triggers.onTrigger { event ->
+    when (event.type) {
+        "popup"       -> showPopupDialog(event.content)
+        "banner"      -> showTopBanner(event.content)
+        "toast"       -> showToast(event.content.body)
+        "bottomSheet" -> showBottomSheet(event.content)
+    }
+}
+
+// Evaluate trigger rules for the current screen
+CypienSDK.triggers.evaluate(forScreen = "/products/sku-123")
+```
+
+---
+
 ## Debug & Testing
 
 ### Enable debug mode
@@ -419,7 +476,7 @@ if (BuildConfig.DEBUG) {
 
 ---
 
-## Privacy & GDPR
+## Privacy / GDPR
 
 CypienSDK provides first-class support for privacy regulations including GDPR and CCPA. All opt-out and data deletion APIs take effect immediately and persist across app restarts.
 
@@ -451,14 +508,42 @@ CypienSDK.deleteUserData()
 
 ---
 
-## Configuration Reference
+## How It Works
+
+```
+1. SDK Init
+   └─ Fetches workspace settings: trigger rules, content slots, interest hierarchy
+
+2. Behavioral Data Collection
+   └─ trackScreen(), commerce.viewItem(), addToCart(), commerce.search() ...
+      Events are buffered in memory
+
+3. Batch Emission (every 15s by default)
+   └─ POST /v1/events → Cypien backend
+   └─ Forwarded to Firebase GA4 (if FirebaseAnalytics is linked)
+
+4. Interest Assignment (backend)
+   └─ Browsing patterns are analyzed
+   └─ User is assigned an interest segment (e.g. "sport", "electronics")
+
+5. Personalization Request
+   └─ fetchDescription() / fetchProductImage() called on product detail screen
+   └─ Backend returns content filtered by the user's interest segment
+
+6. Content Rendered
+   └─ Product description and/or image replaced with personalized version
+```
+
+---
+
+## Configuration
 
 All parameters are set once via `CypienConfig` at initialization time.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `workspaceId` | `String` | — | **Required.** Your workspace identifier, found in the Cypien Dashboard. |
-| `apiKey` | `String` | — | **Required.** Your secret API key, found in the Cypien Dashboard. |
+| `workspaceId` | `String` | — | **Required.** Your workspace identifier, obtain from Cypien. |
+| `apiKey` | `String` | — | **Required.** Your secret API key, obtain from Cypien. |
 | `debugMode` | `Boolean` | `false` | When `true`, enables verbose Logcat output for all SDK activity. |
 | `emitInterval` | `Long` | `15L` | Interval in seconds between automatic event batch flushes. |
 | `emitMode` | `EmitMode` | `DUAL` | Controls event routing. `DUAL` sends to both Cypien backend and GA4. `GA4_ONLY` skips the Cypien backend. `BACKEND_ONLY` skips GA4. |
