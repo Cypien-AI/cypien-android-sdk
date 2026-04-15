@@ -36,7 +36,12 @@ In `app/build.gradle`:
 
 ```gradle
 dependencies {
-    implementation 'io.cypien:sdk-android:1.0.0'
+    implementation 'io.cypien:sdk-android:1.0.2'
+
+    // Required dependencies
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+    implementation 'androidx.work:work-runtime-ktx:2.9.0'
+    implementation 'androidx.lifecycle:lifecycle-process:2.7.0'
 }
 ```
 
